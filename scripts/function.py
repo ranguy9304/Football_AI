@@ -1,83 +1,108 @@
-from multiprocessing.connection import wait
 from os import stat
 from time import sleep
+# from turtle import update
 # from turtle import speed
 from cv2 import imshow
 import pygame
 import sys
 import cv2
+def distance(x1, y1, x2, y2):
+    return ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
 def slope(x1, y1, x2, y2):
     return (y2 - y1) / (x2 - x1)
 def cos(x1, y1, x2, y2):
-    return 1-slope(x1, y1, x2, y2)**2 / (1 + slope(x1, y1, x2, y2) ** 2)
+    return (x2-x1)/distance(x1, y1, x2, y2)
 def sin(x1, y1, x2, y2):
-    return 2*slope(x1, y1, x2, y2) / (1 + slope(x1, y1, x2, y2) ** 2)
+    return (y2-y1)/distance(x1, y1, x2, y2)
 def magnitiude(speed):
     return (speed[0] ** 2 + speed[1] ** 2) ** 0.5
+
+class player():
+    def __init__(self, x, y, speed, radius,type, team):
+        self.x = x
+        self.y = y
+        self.speed = speed
+        self.radius = radius
+        self.team = team
+        self.type = type
+
+    def follow_ball(self,ball_cords):
+        self.x += cos(self.x, self.y, ball_cords[0], ball_cords[1]) * self.speed
+        self.y += sin(self.x, self.y, ball_cords[0], ball_cords[1]) *  self.speed
+    
+
 class Ball():
     def __init__(self,path):
-        self.x = 100
-        self.y = 100
+        self.cords= [100.0,100.0]
+        
+        self.velo = [0,1]
         self.radius = 10
         self.color = (255, 255, 255)
         self.ball = pygame.image.load(path)
         self.ball = pygame.transform.scale(self.ball, (self.radius * 2, self.radius * 2))
+        self.ball_rect = self.ball.get_rect()
+        self.velo_mag=magnitiude(self.velo)
+    def update(self):
+        self.ball_rect.center = self.cords
+
+    def move(self):
+        self.cords[0] += self.velo[0]
+        self.cords[1]+= self.velo[1]
+        # increment velo 
+        self.velo=[self.velo[0]+0.1,self.velo[1]+0.1] 
+        self.update()
+        
 
 
 class Pygame_window:
-    def __init__(self, bg):
+    def __init__(self):
         pygame.init()
-        self.size = cv2_window.give_size(bg)
+        self.bg_path="assets/images/background/bg.jpg"
+        self.size = cv2_window.give_size(self.bg_path)
         self.width, self.height = self.size
         self.screen = pygame.display.set_mode(self.size)
         self.ball_obj=Ball("assets/ball/intro_ball.gif")
-        self.bg = pygame.image.load(bg)
-        self.ballrect = self.ball_obj.ball.get_rect()
-        self.speed = [0, 10]
+        self.bg = pygame.image.load(self.bg_path)
+        self.team_size = 1
+        self.players_1 = []
+        self.players_1.append(player(500, 100, 5, 10, "goalkeeper", 1))
 
         # self.main_loop()
+
+    def go_mouse(self,event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+                    x2, y2 = event.pos
+                    x1, y1 = self.ball_obj.ball_rect.center
+                    self.ball_obj.velo = [self.ball_obj.velo_mag*cos(x1,y1,x2,y2),self.ball_obj.velo_mag*sin(x1,y1,x2,y2) ]
+                    print(self.ball_obj.velo)
+    def reflect(self):
+        if self.ball_obj.ball_rect.left < 0 or self.ball_obj.ball_rect.right > self.width:
+                self.ball_obj.velo[0] = -self.ball_obj.velo[0]
+        if self.ball_obj.ball_rect.top < 0 or self.ball_obj.ball_rect.bottom > self.height:
+            self.ball_obj.velo[1] = -self.ball_obj.velo[1]
+    
+
 
     def main_loop(self):
         while 1:
             self.screen.blit(self.bg, (0, 0))
 
             for event in pygame.event.get():
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    
-                    x, y = event.pos
-                    print(x, y)
-                    print("pos", self.ballrect.center)
-                    x1, y1 = self.ballrect.center
-                    # slope_value = slope(x1, y1, x, y)
-                    # print values of cos and sin
-                    print(cos(x1, y1, x, y), sin(x1, y1, x, y))
-
-                    self.speed = [magnitiude(self.speed)*cos(x1,y1,x,y), magnitiude(self.speed)*sin(x1,y1,x,y)]
-                    print(self.speed)
-                
-
+                self.go_mouse(event)
                 if event.type == pygame.QUIT: sys.exit()
 
-
-            self.ballrect = self.ballrect.move(self.speed)
-
-            if self.ballrect.left < 0 or self.ballrect.right > self.width:
-
-                self.speed[0] = -self.speed[0]
-
-            if self.ballrect.top < 0 or self.ballrect.bottom > self.height:
-
-                self.speed[1] = -self.speed[1]
+            self.ball_obj.move()
+            self.reflect()
 
 
-            # screen.fill(black)
+            for player in self.players_1:
+                player.follow_ball(self.ball_obj.ball_rect.center)
+                pygame.draw.circle(self.screen, (255, 255, 255),(int(player.x), int(player.y)), player.radius)
 
-            self.screen.blit(self.ball_obj.ball, self.ballrect)
 
+            self.screen.blit(self.ball_obj.ball, self.ball_obj.ball_rect)
             pygame.display.flip()
             sleep(0.02)
-
-            # end if pressed esc
             
 
 class cv2_window:
