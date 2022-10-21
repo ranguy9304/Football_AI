@@ -1,3 +1,4 @@
+from operator import index
 from os import stat
 from time import sleep
 # from turtle import update
@@ -17,20 +18,60 @@ def sin(x1, y1, x2, y2):
 def magnitiude(speed):
     return (speed[0] ** 2 + speed[1] ** 2) ** 0.5
 
+
+
+global player_coords
+player_coords = {}
+global index_player
+index_player = 0
+
 class player():
+
     def __init__(self, x, y, speed, radius,type, team):
+        global player_coords
+        global index_player
         self.x = x
         self.y = y
         self.speed = speed
         self.radius = radius
         self.team = team
         self.type = type
+        self.index = index_player
+        player_coords[index_player] = [x, y]
+
+
+        index_player += 1
+        
+
 
     def follow_ball(self,ball_cords):
         self.x += cos(self.x, self.y, ball_cords[0], ball_cords[1]) * self.speed
         self.y += sin(self.x, self.y, ball_cords[0], ball_cords[1]) *  self.speed
-    
 
+    # if player touch the ball
+    def touch_ball(self,ball_cords):
+        if distance(self.x, self.y, ball_cords[0], ball_cords[1]) <= self.radius:
+            return True
+        else:
+            return False
+    def closest_player(self):
+        closest = None
+        for i in player_coords:
+            if i != self.index:
+                if closest == None:
+                    closest = i
+                else:
+                    if distance(self.x, self.y, player_coords[i][0], player_coords[i][1]) < distance(self.x, self.y, player_coords[closest][0], player_coords[closest][1]):
+                        closest = i
+        return closest
+
+    def pass_ball(self,ball):
+        closest_player = self.closest_player()
+        velo_pass=10
+        ball.velo = [ball.velo_mag*cos(ball.cords[0],ball.cords[1],player_coords[closest_player][0],player_coords[closest_player][1]),ball.velo_mag*sin(ball.cords[0],ball.cords[1],player_coords[closest_player][0],player_coords[closest_player][1])]
+        print(ball.velo)
+        ball.moving = True
+        
 class Ball():
     def __init__(self,path):
         self.cords= [100.0,100.0]
@@ -42,6 +83,7 @@ class Ball():
         self.ball = pygame.transform.scale(self.ball, (self.radius * 2, self.radius * 2))
         self.ball_rect = self.ball.get_rect()
         self.velo_mag=magnitiude(self.velo)
+        self.moving=True
     def update(self):
         self.ball_rect.center = self.cords
 
@@ -49,7 +91,7 @@ class Ball():
         self.cords[0] += self.velo[0]
         self.cords[1]+= self.velo[1]
         # increment velo 
-        self.velo=[self.velo[0]+0.1,self.velo[1]+0.1] 
+        # self.velo=[self.velo[0],self.velo[1]] 
         self.update()
         
 
@@ -65,7 +107,11 @@ class Pygame_window:
         self.bg = pygame.image.load(self.bg_path)
         self.team_size = 1
         self.players_1 = []
-        self.players_1.append(player(500, 100, 5, 10, "goalkeeper", 1))
+        self.players_1.append(player(700, 200, 4, 10, "goalkeeper", 1))
+        self.players_1.append(player(500, 700, 6, 10, "goalkeeper", 1))
+        # self.players_1.append(player(300, 500, 4, 10, "goalkeeper", 1))
+        # self.players_1.append(player(10, 300, 4, 10, "goalkeeper", 1))
+        
 
         # self.main_loop()
 
@@ -84,20 +130,53 @@ class Pygame_window:
 
 
     def main_loop(self):
+        index=0
         while 1:
+            # print("worlk")
             self.screen.blit(self.bg, (0, 0))
 
             for event in pygame.event.get():
                 self.go_mouse(event)
                 if event.type == pygame.QUIT: sys.exit()
+                # if space pressed pass ball
+                if event.type == pygame.KEYDOWN:
+                    if self.ball_obj.moving==False:
+                        if event.key == pygame.K_SPACE:
+                            self.players_1[index].pass_ball(self.ball_obj)
 
-            self.ball_obj.move()
+            
             self.reflect()
+            if self.ball_obj.moving==False:
+                for player in self.players_1:
+                    pygame.draw.circle(self.screen, (255, 255, 255),(int(player.x), int(player.y)), player.radius)
+
+                    self.players_1[index].follow_ball([50,50])
 
 
-            for player in self.players_1:
-                player.follow_ball(self.ball_obj.ball_rect.center)
-                pygame.draw.circle(self.screen, (255, 255, 255),(int(player.x), int(player.y)), player.radius)
+            if self.ball_obj.moving==True:
+                for player in self.players_1:
+                    pygame.draw.circle(self.screen, (255, 255, 255),(int(player.x), int(player.y)), player.radius)
+                    if(player.touch_ball(self.ball_obj.ball_rect.center)):
+                        if player.index!=index:
+                            print("touch")
+                            self.ball_obj.ball_rect.center=[player.x,player.y]
+                            self.ball_obj.velo=[0,0]
+                            player.follow_ball((164,300))
+                            index=player.index
+                            print(index)
+                            self.ball_obj.moving=False
+                        else:
+                            print("same player")
+                            player.follow_ball(self.ball_obj.ball_rect.center)
+                        # self.ball_obj.velo_mag=magnitiude(self.ball_obj.velo)
+                        # print(self.ball_obj.velo)
+                    else:
+                        # self.ball_obj.moving=True
+                        player.follow_ball(self.ball_obj.ball_rect.center)
+            pygame.draw.circle(self.screen, (255, 0, 0), (164,300), self.ball_obj.radius)
+            if self.ball_obj.moving:
+                self.ball_obj.move()
+
 
 
             self.screen.blit(self.ball_obj.ball, self.ball_obj.ball_rect)
